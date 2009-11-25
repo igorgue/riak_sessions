@@ -1,6 +1,7 @@
 .DS_Store
 unicorn.rb
 *.db
+*.gem
 *.swp
 *.swo
 *.pid
