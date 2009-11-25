@@ -1,0 +1,17 @@
+.DS_Store
+unicorn.rb
+*.db
+*.swp
+*.swo
+*.pid
+*.log
+*.svn
+*.hg
+*.tmproj
+*~
+_trial_temp
+tags
+build
+dist
+cscope.out
+cscope.files
