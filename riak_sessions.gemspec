@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name = 'riak_sessions'
-  s.version = '0.1'
+  s.version = '0.2'
 
   s.authors = ['Igor Guerrero']
   s.date = '2009-11-24'
