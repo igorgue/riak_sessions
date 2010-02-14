@@ -1,12 +1,9 @@
 require 'rack/session/abstract/id'
 require 'thread'
-require 'base64'
-require 'jiak'
 
 module Rack
 
   # The Rack::Session::Riak uses the open source document-oriented web database Riak as a sessions backend,
-  # it uses the Jiak ruby client library: http://hg.basho.com/riak/src/tip/client_lib/jiak.rb
   # more info about Riak: http://riak.basho.com/
   #
   # Examples:
@@ -15,8 +12,10 @@ module Rack
 
   module Session
     class RiakPool
-      def initialize(server, port, options)
-        @riak = JiakClient.new(server, port, '/jiak/', options)
+      def initialize(host, port, options={})
+        @host= host
+        @port = port
+        @path ='/raw/riak_session'
       end
 
       def [](session_id)
@@ -24,11 +23,10 @@ module Rack
       end
 
       def get(session_id)
-        raise if session_id.nil? or session_id.empty?
-        session = @riak.fetch('rack_session', session_id)
-        data = Marshal.load(Base64.decode64(session['object']['data']))
-        return data
-      rescue JiakException => e
+        req = Net::HTTP::Get.new([@path, session_id].join('/'))
+        res = Net::HTTP.start(@host, @port) { |http| http.request(req) }
+        return Marshal.load(res.body)
+      rescue Net::HTTPNotFound => e
         return nil
       end
 
@@ -37,19 +35,16 @@ module Rack
       end
 
       def set(session_id, data)
-        begin
-          raise JiakException if session_id.nil?
-          session = @riak.fetch('rack_session', session_id)
-        rescue JiakException => e
-          session = {'bucket'=>'rack_session', 'key'=>session_id, 'links'=>[]}
-        end
-        session['object'] = {'data'=>Base64.encode64(Marshal.dump(data))}
-        @riak.store(session)
+        req = Net::HTTP::Put.new([@path, session_id].join('/'))
+        req.content_type = 'application/octet-stream'
+        req.body = Marshal.dump(data)
+        Net::HTTP.start(@host, @port) { |http| http.request(req) }
         return true
       end
 
       def delete(session_id)
-        @riak.delete('rack_session', session_id)
+        req = Net::HTTP::Delete.new([@path, session_id].join('/'))
+        Net::HTTP.start(@host, @port) { |http| http.request(req) }
       end
     end
 
@@ -58,15 +53,14 @@ module Rack
       DEFAULT_OPTIONS = Abstract::ID::DEFAULT_OPTIONS.merge(
         :drop         => false,
         :riak_server  => '127.0.0.1',
-        :riak_port    => 8098,
-        :riak_options => {'w'=>'3','dw'=>'3'})
+        :riak_port    => 8098
+      )
 
       def initialize(app, options={})
         super
 
         @pool = RiakPool.new(@default_options[:riak_server],
-                             @default_options[:riak_port],
-                             @default_options[:riak_options])
+                             @default_options[:riak_port])
         @mutex = Mutex.new
       end
 
